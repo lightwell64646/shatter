@@ -19,10 +19,10 @@ public class clickShatter : MonoBehaviour
             if (Physics.Raycast(ray, out hit))
             {
                 hit.collider.GetComponent<Renderer>().material.color = Color.red;
-                shatter oShatter = hit.collider.GetComponent<shatter>();
+                shatter oShatter = hit.collider.GetComponent<shatterObj>();
                 if (oShatter != null){
                     preparePatern(hit.collider.transform.InverseTransformPoint(hit.point));
-                    oShatter.applyPattern(cells);
+                    oShatter.shatter(cells);
                     if (addVisual)
                         Instantiate(shatterPrefab, hit.point, Quaternion.identity);
                 }

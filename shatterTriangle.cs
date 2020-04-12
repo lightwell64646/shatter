@@ -1,6 +1,7 @@
 public class shatterTriangle{
     public List<shatterVert> verts;
     public bool isConsumed = false;
+    public bool culled = false;
 
     private Vector3 norm, right, up;
     private float det;
@@ -33,7 +34,9 @@ public class shatterTriangle{
         det = 1/(a*d-b*c);
     }
 
-    public shatterVert intersect(Vector3 l1, Vector3 l2){
+    public shatterVert intersect(shatterVert l1V, shatterVert l2V){
+        Vector3 l1 = l1V.pos;
+        Vector3 l2 = l2V.pos;
         Vector3 lv = l2 - l1;
         Vector3 lo = l1 - verts[0].pos;
         float travelT = -Vector3.Dot(lo, norm) / Vector3.Dot(lv, norm);
@@ -50,8 +53,20 @@ public class shatterTriangle{
 
         Vector2 UV = self.verts[2].uv*bari[0] + self.verts[1].uv*bari[1] + self.verts[0].uv*w;
         shatterVert res = new shatterVert(proj, UV);
+        res.intersectionV1 = l1V;
+        res.intersectionV2 = l2V;
         res.isIntersection = true;
         return res;
+    }
+
+    public bool containsPlanar(Vector3 p){
+        Vector2 proj2 = collapse(p);
+        Vector2 bari = new Vector2(d*proj2[0] - b*proj2[1], a*proj2[1] - c*proj2[0]);
+        bari = det*bari;
+        float w = 1 - bari[0] - bari[1];
+        if (bari[0] < 0 || bari[1] < 0 || w < 0)
+            return false;
+        return true;
     }
 
     public shatterVert portIn(shatterVert v){
@@ -64,9 +79,6 @@ public class shatterTriangle{
     }
 
     private collapse(Vector3 v3){
-        return new Vector2(Vector3.Dot(v3, right), (Vector3.Dot(v3, up));
+        return new Vector2(Vector3.Dot(v3, right), (Vector3.Dot(v3, up)));
     }
-
-
-    
 }

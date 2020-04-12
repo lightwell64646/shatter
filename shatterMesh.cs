@@ -34,12 +34,14 @@ public class shatterMesh{
     private void cutTri(shatterTriangle tri, shatterTriangle other){
         List<shatterVert> intersects = new List<shatterVert>();
         for (int i=0; i < 3; i++){
-            shatterVert intersect = tri.intersect(other.verts[i].pos, other.verts[(i+1)%3].pos);
+            shatterVert intersect = tri.intersect(other.verts[i], other.verts[(i+1)%3]);
             if (intersect != null && getDuplicate(intersect.pos, intersects) == -1){
+                intersect.isIntersection = true;
                 intersects.Add(intersect);
             }
-            shatterVert intersect = other.intersect(verts[i].pos, verts[(i+1)%3].pos);
+            shatterVert intersect = other.intersect(verts[i], verts[(i+1)%3]);
             if (intersect != null && getDuplicate(intersect.pos, intersects) == -1){
+                intersect.isIntersection = true;
                 intersects.Add(tri.portIn(intersect));
             }
         }
@@ -56,7 +58,7 @@ public class shatterMesh{
     }
 
     private void repairTri(shatterTriangle tri, List<shatterVert> intersects){
-        int dup;
+        int dup, dup2;
         if (intersects.Count == 2){
             if ((dup = getDuplicate(intersects[0], verts)) == -1){
                 if ((dup = getDuplicate(intersects[1], verts)) == -1){
@@ -69,8 +71,11 @@ public class shatterMesh{
             }
             else{
                 verts[dup].isIntersection = true;
-                if ((dup = getDuplicate(intersects[1], verts)) == -1){
+                if ((dup2 = getDuplicate(intersects[1], verts)) == -1){
                     repairTri1(tri, intersects[1]);
+                }
+                else{
+                    verts[dup2].isIntersection = true;
                 }
             }
         }
@@ -88,11 +93,32 @@ public class shatterMesh{
     }
 
     private void repairTri1(shatterTriangle triangle, shatterVert inter){
-        
+        for (int i=0; i<3; i++){
+            if (nonLinear(triangle.verts[i], triangle.verts[(i+1)%3], inter)){
+                triangles.Add(new shatterTriangle(triangle.verts[i], triangle.verts[(i+1)%3], inter));
+            }
+        }
+        triangle.culled = true;
     }
 
     private void repairTri2(shatterTriangle triangle, List<shatterVert> intersects){
-        
+        for (int i=0; i<3; i++){
+            if (nonLinear(triangle.verts[i].pos, triangle.verts[(i+1)%3].pos, intersects[0].pos)){
+                shatterTriangle newTri = new shatterTriangle(triangle.verts[i], triangle.verts[(i+1)%3], intersects[0]);
+                if (newTri.containsPlanar(intersects[1].pos)){
+                    repairTri1(newTri);
+                }
+                else{
+                    triangles.Add(newTri);
+                }
+            }
+        }
+        triangle.culled = true;
+    }
+
+    private bool nonLinear(Vector3 p1, Vector3 p2, Vector3 p3){
+        float metric = Vector3.Dot(Vector3.Normalize(p2-p1), Vector3.Normalize(p3-p1));
+        return metric < 1-epsilon && metric > epsilon - 1;
     }
 
     private createShatterMesh(Mesh m, Vector3 offset){
