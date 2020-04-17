@@ -19,7 +19,7 @@ public class clickShatter : MonoBehaviour
             if (Physics.Raycast(ray, out hit))
             {
                 hit.collider.GetComponent<Renderer>().material.color = Color.red;
-                shatter oShatter = hit.collider.GetComponent<shatterObj>();
+                shatterObj oShatter = hit.collider.GetComponent<shatterObj>();
                 if (oShatter != null){
                     preparePatern(hit.collider.transform.InverseTransformPoint(hit.point));
                     oShatter.shatter(cells);
@@ -31,9 +31,12 @@ public class clickShatter : MonoBehaviour
     }
     
     private void preparePatern(Vector3 offset){
-        foreach (Transform child in shatterPrefab.transform)
-        {
-            cells.Add(new shatterMesh(child.GetComponent<MeshFilter>(), offset + child.transform.position));
+        foreach (Transform child in shatterPrefab.transform){
+            shatterMesh newCell = new shatterMesh(child.GetComponent<MeshFilter>().sharedMesh, offset + child.transform.position);
+            foreach (shatterTriangle tri in newCell.triangles){
+                tri.isSubstrate = false;
+            }
+            cells.Add(newCell);
         }
     }
 }
