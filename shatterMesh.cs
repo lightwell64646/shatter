@@ -6,9 +6,9 @@ public class shatterMesh{
 
     public List<shatterVert> verts;
     public List<shatterTriangle> triangles;
-
     private List<shatterVert> newIntersects;
-    private float epsilon = 1E-6f;
+
+    private float epsilon = 1E-5f;
 
     public shatterMesh(Mesh m){
         createShatterMesh(m, new Vector3(0,0,0));
@@ -153,6 +153,13 @@ public class shatterMesh{
     }
 
     private void repairTri1(shatterTriangle triangle, shatterVert inter){
+        int dup = getDuplicate(inter.pos,verts);
+        if (dup == -1){
+            verts.Add(inter);
+        }
+        else{
+            inter = verts[dup];
+        }
         for (int i=0; i<3; i++){
             if (nonLinear(triangle.verts[i].pos, triangle.verts[(i+1)%3].pos, inter.pos)){
                 triangles.Add(new shatterTriangle(triangle.verts[i], triangle.verts[(i+1)%3], inter, triangle.isSubstrate));
@@ -162,6 +169,13 @@ public class shatterMesh{
     }
 
     private void repairTri2(shatterTriangle triangle, List<shatterVert> intersects){
+        int dup = getDuplicate(intersects[0].pos,verts);
+        if (dup == -1){
+            verts.Add(intersects[0]);
+        }
+        else{
+            intersects[0] = verts[dup];
+        }
         for (int i=0; i<3; i++){
             if (nonLinear(triangle.verts[i].pos, triangle.verts[(i+1)%3].pos, intersects[0].pos)){
                 shatterTriangle newTri = new shatterTriangle(triangle.verts[i], triangle.verts[(i+1)%3], intersects[0], triangle.isSubstrate);
