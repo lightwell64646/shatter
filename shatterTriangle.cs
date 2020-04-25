@@ -17,6 +17,8 @@ public class shatterTriangle{
     private float a,b,c,d;
     
     private float epsilon = 1E-4f;
+    private List<shatterTriangle> seenOnce;
+    private List<shatterVert> seenOnceVerts;
 
     public shatterTriangle(shatterVert v1, shatterVert v2, shatterVert v3, bool isSubstrateTri){
         verts = new List<shatterVert>();
@@ -26,7 +28,6 @@ public class shatterTriangle{
         storedIntersects = new List<shatterVert>();
         adjacent = new List<shatterTriangle>();
         isSubstrate = isSubstrateTri;
-        populateAdjacent();
 
         norm = Vector3.Cross(v2.pos - v1.pos, v3.pos - v1.pos);
         norm = Vector3.Normalize(norm);
@@ -56,7 +57,7 @@ public class shatterTriangle{
         float loDist = Vector3.Dot(lo, norm);
         float lvAlign = Vector3.Dot(lv, norm);
         float travelT = -loDist / lvAlign;
-        if (travelT > 1+epsilon || travelT < -epsilon || lvAlign == 0){
+        if (travelT > 1+epsilon || travelT < -epsilon || Mathf.Abs(lvAlign) < epsilon){
             return null;
         }
         
@@ -92,45 +93,53 @@ public class shatterTriangle{
         float w = 1 - bari[0] - bari[1];
         Vector2 UV = verts[2].uv*bari[0] + verts[1].uv*bari[1] + verts[0].uv*w;
         shatterVert ported = new shatterVert(v.pos, UV);
-        if (isSubstrate){
-            ported.intersectionTunnel = v;
-        }
+        ported.intersectTunnel = v;
+        v.intersectTunnel = ported;
         return ported;
     }
 
     public void populateAdjacent(){
-        List<shatterTriangle> seenOnce = new List<shatterTriangle>();
-        List<shatterVert> seenOnceVerts = new List<shatterVert>();
+        seenOnce = new List<shatterTriangle>();
+        seenOnceVerts = new List<shatterVert>();
         foreach (shatterVert v in verts){
             foreach(shatterTriangle t in v.faces){
-                if (!adjacent.Contains(t)){
-                    int seenIndex = seenOnce.IndexOf(t);
-                    if (seenIndex != -1){
-                        if (!seenOnceVerts[seenIndex].excludeEdges.Contains(v)){
-                            adjacent.Add(t);
-                            t.adjacent.Add(this);
-                        }
-                    }
-                    else{
-                        seenOnce.Add(t);
-                        seenOnceVerts.Add(v);
-                    }
+                considerConnection(t, v);
+            }
+            if (v.flatShadeWeld != null){
+                foreach(shatterTriangle t in v.flatShadeWeld.faces){
+                    considerConnection(t, v.flatShadeWeld);
                 }
+                v.flatShadeWeld.faces.Add(this);
             }
             v.faces.Add(this);
         }
     }
 
-    public void populateAdjacentTunneled(){
-        populateAdjacentTunneled(true);
+    private void considerConnection(shatterTriangle t, shatterVert v){
+        if (!adjacent.Contains(t)){
+            int seenIndex = seenOnce.IndexOf(t);
+            if (seenIndex != -1){
+                if (!seenOnceVerts[seenIndex].excludeEdges.Contains(v)){
+                    adjacent.Add(t);
+                    t.adjacent.Add(this);
+                }
+            }
+            else{
+                seenOnce.Add(t);
+                seenOnceVerts.Add(v);
+            }
+        }
     }
-    public void populateAdjacentTunneled(bool tunnelInternal){
+
+    public void populateAdjacentTunneled(bool intersectTunnelInternal){
         foreach (shatterVert v in verts){
-            if (v.intersectionTunnel != null){
-                foreach(shatterTriangle t in v.intersectionTunnel.faces){
-                    float tDepth = characteriseTriangleSide(t);
-                    if ((tDepth > epsilon && tunnelInternal) || (tDepth < -epsilon && !tunnelInternal)){
-                        adjacent.Add(t);
+            if (v.intersectTunnel != null){
+                foreach(shatterTriangle t in v.intersectTunnel.faces){
+                    if (!adjacent.Contains(t)){
+                        float tDepth = characteriseTriangleSide(t);
+                        if ((tDepth > epsilon && !intersectTunnelInternal) || (tDepth < -epsilon && intersectTunnelInternal)){
+                            adjacent.Add(t);
+                        }
                     }
                 }
             }

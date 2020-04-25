@@ -8,7 +8,7 @@ public class shatterMesh{
     public List<shatterTriangle> triangles;
 
     private List<shatterVert> newIntersects;
-    private float epsilon = 1E-7f;
+    private float epsilon = 1E-6f;
 
     public shatterMesh(Mesh m){
         createShatterMesh(m, new Vector3(0,0,0));
@@ -21,14 +21,15 @@ public class shatterMesh{
     public shatterMesh(){
         verts = new List<shatterVert>();
         triangles = new List<shatterTriangle>();
+        newIntersects = new List<shatterVert>();
     }
 
     public void intersect(shatterMesh other){
         int thisOrigTris = triangles.Count;
         cut(other);
         other.cut(this, thisOrigTris);
-        foreach (shatterTriangle tri in triangles){
-            tri.populateAdjacentTunneled();
+        for (int i=thisOrigTris; i<triangles.Count; i++){
+            triangles[i].populateAdjacentTunneled(true);
         }
     }
 
@@ -36,7 +37,8 @@ public class shatterMesh{
         cut(other, other.triangles.Count);
     }
     public void cut(shatterMesh other, int otherOrigTris){
-        newIntersects = new List<shatterVert>();
+        newIntersects.Clear();
+        int thisOrigTris = triangles.Count;
         for (int i=0; i<otherOrigTris; i++){
             int startStepTris = triangles.Count;
             for (int j=0; j<startStepTris; j++){
@@ -44,6 +46,9 @@ public class shatterMesh{
                     cutTri(triangles[j], other.triangles[i]);
                 }
             }
+        }
+        for (int i=thisOrigTris; i<triangles.Count; i++){
+            triangles[i].populateAdjacent();
         }
     }
 
@@ -64,10 +69,21 @@ public class shatterMesh{
                     }
                 }
                 intersects.Add(intersect);
+                other.storedIntersects.Add(other.portIn(intersect));
             }
             shatterVert intersectOther = other.intersect(tri.verts[i], tri.verts[(i+1)%3]);
             if (intersectOther != null && getDuplicate(intersectOther.pos, intersects) == -1){
-                intersects.Add(tri.portIn(intersectOther));
+                shatterVert intersectThis = null;
+                if (tri.storedIntersects.Count != 0){
+                    int dup = getDuplicate(intersectOther.pos, tri.storedIntersects);
+                    if (dup != -1){
+                        intersectThis = tri.storedIntersects[dup];
+                    }
+                }
+                if (intersectThis == null){
+                    intersectThis = tri.portIn(intersectOther);
+                }
+                intersects.Add(intersectThis);
                 other.storedIntersects.Add(intersectOther); 
             }
         }
@@ -112,8 +128,10 @@ public class shatterMesh{
             }
         }
         if (intersects.Count == 2){
-            intersects[0].excludeEdges.Add(intersects[1]);
-            intersects[1].excludeEdges.Add(intersects[0]);
+            if (!intersects[0].excludeEdges.Contains(intersects[1]))
+                intersects[0].excludeEdges.Add(intersects[1]);
+            if (!intersects[1].excludeEdges.Contains(intersects[0]))
+                intersects[1].excludeEdges.Add(intersects[0]);
             if (dupCount == 0){
                 repairTri2(tri, intersects);
             }
@@ -121,8 +139,16 @@ public class shatterMesh{
                 repairTri1(tri, intersects[origID]);
             }
         }
-        else if (intersects.Count == 1 && dupCount == 0){
-            repairTri1(tri, intersects[0]);
+        else if (intersects.Count == 1){
+            if (dupCount == 0){
+                repairTri1(tri, intersects[0]);
+            }
+        }
+        else{
+            Debug.Log("too many intersections");
+            foreach (shatterVert i in intersects){
+                Debug.Log(i.pos);
+            }
         }
     }
 
@@ -158,14 +184,24 @@ public class shatterMesh{
     private void createShatterMesh(Mesh m, Vector3 offset){
         verts = new List<shatterVert>();
         triangles =  new List<shatterTriangle>();
+        newIntersects = new List<shatterVert>();
         for (int i=0; i<m.vertices.Length; i++){
+            int dup = getDuplicate(m.vertices[i], verts);
             verts.Add(new shatterVert(m.vertices[i] + offset, m.uv[i]));
+            if (dup != -1){
+                verts[i].flatShadeWeld = verts[dup];
+                verts[dup].flatShadeWeld = verts[i];
+            }
         }
         for (int i=0; i<m.triangles.Length; i+=3){
             triangles.Add(new shatterTriangle(verts[m.triangles[i]],
                                               verts[m.triangles[i+1]],
                                               verts[m.triangles[i+2]],
                                               true));
+        }
+        
+        foreach (shatterTriangle t in triangles){
+            t.populateAdjacent();
         }
     }
 }

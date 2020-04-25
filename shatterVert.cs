@@ -5,7 +5,8 @@ using UnityEngine;
 public class shatterVert{
     public Vector3 pos;
     public Vector2 uv;
-    public shatterVert intersectionTunnel = null;
+    public shatterVert intersectTunnel = null;
+    public shatterVert flatShadeWeld = null;
     public List<shatterTriangle> faces;
     public List<shatterVert> excludeEdges;
     public int meshingNumber = -1;
