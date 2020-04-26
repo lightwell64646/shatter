@@ -61,18 +61,19 @@ public class shatterObj : MonoBehaviour{
             else{
                 newCutTris.Add(currentTri);
             }
-        }  
+        }
+        foreach (shatterTriangle ct in newCutTris){
+            ct.isConsumed = false;
+        }
 
         generateFragment(newSubstrateTris, newCutTris);
     }
 
     private void generateFragment(List<shatterTriangle> subTris, List<shatterTriangle> cutTris){
-        List<Vector3> subVertices = new List<Vector3>();
-        List<Vector3> cutVertices = new List<Vector3>();
-        List<Vector2> subUV = new List<Vector2>();
-        List<Vector2> cutUV = new List<Vector2>();;
-        List<int> subTriangles = new List<int>();
-        List<int> cutTriangles = new List<int>();
+        List<Vector3> Vertices = new List<Vector3>();
+        List<Vector2> UV = new List<Vector2>();
+        List<Vector3> Normals = new List<Vector3>();
+        List<int> Triangles = new List<int>();
         shatterMesh newShatter = new shatterMesh();
         int meshingNumber = 0;
 
@@ -81,46 +82,46 @@ public class shatterObj : MonoBehaviour{
                 if (v.consumptionNumber != consumptionNumber){
                     v.consumptionNumber = consumptionNumber;
                     v.meshingNumber = meshingNumber++;
-                    subVertices.Add(v.pos);
-                    subUV.Add(v.uv);
+                    Vertices.Add(v.pos);
+                    UV.Add(v.uv);
+                    Normals.Add(v.getNorm());
                     newShatter.verts.Add(v);
                 }
-                subTriangles.Add(v.meshingNumber);
+                Triangles.Add(v.meshingNumber);
             }
             newShatter.triangles.Add(tri);
         }
         
-        consumptionNumber++;
-        meshingNumber = 0;
         foreach (shatterTriangle tri in cutTris){
             foreach (shatterVert v in tri.verts){
                 if (v.consumptionNumber != consumptionNumber){
                     v.consumptionNumber = consumptionNumber;
                     v.meshingNumber = meshingNumber++;
-                    cutVertices.Add(v.pos);
-                    cutUV.Add(v.uv);
+                    Vertices.Add(v.pos);
+                    UV.Add(v.uv);
+                    Normals.Add(v.getNorm());
                     newShatter.verts.Add(v);
                 }
-                cutTriangles.Add(v.meshingNumber);
+                Triangles.Add(v.meshingNumber);
             }
-            newShatter.triangles.Add(tri);
+
+            //add the reverse triangles for good measure
+            Triangles.Add(tri.verts[0].meshingNumber);
+            Triangles.Add(tri.verts[2].meshingNumber);
+            Triangles.Add(tri.verts[1].meshingNumber);
+            newShatter.triangles.Add(new shatterTriangle(tri.verts[0], tri.verts[1], tri.verts[2], true));
+            newShatter.triangles.Add(new shatterTriangle(tri.verts[0], tri.verts[2], tri.verts[1], true));
         }
         consumptionNumber++;
 
         Mesh newSubMesh = new Mesh();
-        newSubMesh.vertices = subVertices.ToArray();
-        newSubMesh.uv = subUV.ToArray();
-        newSubMesh.triangles = subTriangles.ToArray();
-        Mesh newCutMesh = new Mesh();
-        newCutMesh.vertices = cutVertices.ToArray();
-        newCutMesh.uv = cutUV.ToArray();
-        newCutMesh.triangles = cutTriangles.ToArray();
+        newSubMesh.vertices = Vertices.ToArray();
+        newSubMesh.uv = UV.ToArray();
+        newSubMesh.triangles = Triangles.ToArray();
+        newSubMesh.normals = Normals.ToArray();
 
         GameObject newSub = Instantiate(substrateTemplate, transform.position, transform.rotation);
-        GameObject newCut = Instantiate(cutTemplate, transform.position, transform.rotation);
-        newCut.GetComponent<MeshFilter>().mesh = newCutMesh;
         newSub.GetComponent<MeshFilter>().mesh = newSubMesh;
         newSub.GetComponent<shatterObj>().substrate = newShatter;
-        newCut.transform.parent = newSub.transform;
     }
 }

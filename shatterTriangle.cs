@@ -72,6 +72,7 @@ public class shatterTriangle{
 
         Vector2 UV = verts[2].uv*bari[0] + verts[1].uv*bari[1] + verts[0].uv*w;
         shatterVert res = new shatterVert(proj, UV);
+        res.causalTri = this;
         return res;
     }
 
@@ -131,19 +132,36 @@ public class shatterTriangle{
         }
     }
 
-    public void populateAdjacentTunneled(bool intersectTunnelInternal){
+    public void populateAdjacentTunneled(bool intersectTunnelInternal = true){
         foreach (shatterVert v in verts){
             if (v.intersectTunnel != null){
                 foreach(shatterTriangle t in v.intersectTunnel.faces){
-                    if (!adjacent.Contains(t)){
-                        float tDepth = characteriseTriangleSide(t);
-                        if ((tDepth > epsilon && !intersectTunnelInternal) || (tDepth < -epsilon && intersectTunnelInternal)){
-                            adjacent.Add(t);
-                        }
-                    }
+                    considerConnectionTunnel(t, intersectTunnelInternal, v);
                 }
             }
         }
+    }
+    
+    private void considerConnectionTunnel(shatterTriangle t, bool tunnelIn, shatterVert v){
+        if (adjacent.Contains(t)) return;
+        float tDepth = characteriseTriangleSide(t);
+        if ((tDepth > epsilon && !tunnelIn) || (tDepth < -epsilon && tunnelIn)){
+            adjacent.Add(t);
+        }
+        else{
+            t.culled=true;
+        }
+    }
+
+    private float characteriseTriangleSide(shatterTriangle t){
+        float bestMetric = 0;
+        foreach (shatterVert v in t.verts){
+            float metric = Vector3.Dot(v.pos - verts[0].pos, norm);
+            if (Mathf.Abs(metric) > Mathf.Abs(bestMetric)){
+                bestMetric = metric;
+            }
+        }
+        return bestMetric;
     }
 
     public void cull(){
@@ -154,16 +172,6 @@ public class shatterTriangle{
         foreach (shatterVert v in verts){
             v.faces.Remove(this);
         }
-    }
-
-    private float characteriseTriangleSide(shatterTriangle t){
-        foreach (shatterVert v in t.verts){
-            float metric = Vector3.Dot(v.pos - verts[0].pos, norm);
-            if (metric < -epsilon || metric > epsilon){
-                return metric;
-            }
-        }
-        return 0;
     }
 
     private Vector2 collapse(Vector3 v3){

@@ -8,6 +8,7 @@ public class shatterVert{
     public shatterVert intersectTunnel = null;
     public shatterVert flatShadeWeld = null;
     public List<shatterTriangle> faces;
+    public shatterTriangle causalTri = null;
     public List<shatterVert> excludeEdges;
     public int meshingNumber = -1;
     public int consumptionNumber = -1;
@@ -23,5 +24,13 @@ public class shatterVert{
         uv = other.uv;
         faces = new List<shatterTriangle>();
         excludeEdges = new List<shatterVert>();
+    }
+
+    public Vector3 getNorm(){
+        Vector3 norm = Vector3.zero;
+        foreach (shatterTriangle f in faces){
+            norm += f.norm;
+        }
+        return norm/faces.Count;
     }
 }

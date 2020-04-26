@@ -6,6 +6,7 @@ public class shatterMesh{
 
     public List<shatterVert> verts;
     public List<shatterTriangle> triangles;
+    //public bool cutFlat = true;
     private List<shatterVert> newIntersects;
 
     private float epsilon = 1E-5f;
