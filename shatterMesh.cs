@@ -34,13 +34,10 @@ public class shatterMesh{
         }
     }
 
-    public void cut(shatterMesh other){
-        cut(other, other.triangles.Count);
-    }
-    public void cut(shatterMesh other, int otherOrigTris){
+    public void cut(shatterMesh other, int otherStartTris = 0){
         newIntersects.Clear();
         int thisOrigTris = triangles.Count;
-        for (int i=0; i<otherOrigTris; i++){
+        for (int i=otherStartTris; i<other.triangles.Count; i++){
             int startStepTris = triangles.Count;
             for (int j=0; j<startStepTris; j++){
                 if (!triangles[j].culled){
