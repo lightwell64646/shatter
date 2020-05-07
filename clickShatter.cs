@@ -32,10 +32,7 @@ public class clickShatter : MonoBehaviour
     
     private void preparePatern(Vector3 offset){
         foreach (Transform child in shatterPrefab.transform){
-            shatterMesh newCell = new shatterMesh(child.GetComponent<MeshFilter>().sharedMesh, offset + child.transform.position);
-            foreach (shatterTriangle tri in newCell.triangles){
-                tri.isSubstrate = false;
-            }
+            shatterMesh newCell = new shatterMesh(child.GetComponent<MeshFilter>().sharedMesh, offset + child.transform.position, false);
             cells.Add(newCell);
         }
     }

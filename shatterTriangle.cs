@@ -10,13 +10,15 @@ public class shatterTriangle{
     public bool isSubstrate;
     public bool culled = false;
     public Vector3 norm;
+    public float area;
+    public bool external;
 
     private Vector3 right, up;
     private Vector2 p02D;
     private float det;
     private float a,b,c,d;
     
-    private float epsilon = 1E-4f;
+    private float epsilon = 1E-12f;
     private List<shatterTriangle> seenOnce;
     private List<shatterVert> seenOnceVerts;
 
@@ -33,7 +35,7 @@ public class shatterTriangle{
         norm = Vector3.Normalize(norm);
 
         up = Vector3.Cross(norm, Vector3.right);
-        if (Vector3.Magnitude(up) < epsilon){
+        if (Vector3.Magnitude(up) < 1E-4f){
             up = Vector3.Cross(norm, Vector3.up);
         }
         up = Vector3.Normalize(up);
@@ -47,6 +49,10 @@ public class shatterTriangle{
         c = ac[1];
         d = bd[1];
         det = 1/(a*d-b*c);
+        area = getArea();
+    }
+    public float getArea(){
+        return Vector3.Magnitude(Vector3.Cross(verts[1].pos - verts[0].pos, verts[2].pos - verts[0].pos));
     }
 
     public shatterVert intersect(shatterVert l1V, shatterVert l2V){
@@ -57,7 +63,8 @@ public class shatterTriangle{
         float loDist = Vector3.Dot(lo, norm);
         float lvAlign = Vector3.Dot(lv, norm);
         float travelT = -loDist / lvAlign;
-        if (travelT > 1+epsilon || travelT < -epsilon || Mathf.Abs(lvAlign) < epsilon){
+        float parallelMetric = Vector3.Dot(Vector3.Normalize(lo), norm);
+        if (travelT > 1 || travelT < 0 || Mathf.Abs(lvAlign) < 1E-4f){
             return null;
         }
         
@@ -72,8 +79,30 @@ public class shatterTriangle{
 
         Vector2 UV = verts[2].uv*bari[0] + verts[1].uv*bari[1] + verts[0].uv*w;
         shatterVert res = new shatterVert(proj, UV);
-        res.causalTri = this;
+        res.projenitorEdges.Add(l1V);
+        res.projenitorEdges.Add(l2V);
         return res;
+    }
+
+    public bool checkIntersect(Vector3 l1, Vector3 l2){
+        Vector3 lv = l2 - l1;
+        Vector3 lo = l1 - verts[0].pos;
+        float loDist = Vector3.Dot(lo, norm);
+        float lvAlign = Vector3.Dot(lv, norm);
+        float travelT = -loDist / lvAlign;
+        if (travelT > 1 || travelT < 0 || Mathf.Abs(lvAlign) < 1E-4f){
+            return false;
+        }
+        
+        Vector3 proj = l1 + lv * travelT;
+        Vector2 proj2 = collapse(proj) - p02D;
+        Vector2 bari = new Vector2(d*proj2[0] - b*proj2[1], a*proj2[1] - c*proj2[0]);
+        bari = det*bari;
+        float w = 1 - bari[0] - bari[1];
+        if (bari[0] < -epsilon || bari[1] < -epsilon || w < -epsilon){
+            return false;
+        }
+        return true;
     }
 
     public bool containsPlanar(Vector3 p){
@@ -81,7 +110,7 @@ public class shatterTriangle{
         Vector2 bari = new Vector2(d*proj2[0] - b*proj2[1], a*proj2[1] - c*proj2[0]);
         bari = det*bari;
         float w = 1 - bari[0] - bari[1];
-        if (bari[0] < -epsilon || bari[1] < -epsilon || w < -epsilon){
+        if (bari[0] < -1E-4f || bari[1] < -1E-4f || w < -1E-4f){
             return false;
         }
         return true;
@@ -96,6 +125,8 @@ public class shatterTriangle{
         shatterVert ported = new shatterVert(v.pos, UV);
         ported.intersectTunnel = v;
         v.intersectTunnel = ported;
+        ported.intersectTunnel = v;
+        ported.projenitorEdges = v.projenitorEdges;
         return ported;
     }
 
@@ -106,12 +137,6 @@ public class shatterTriangle{
             foreach(shatterTriangle t in v.faces){
                 considerConnection(t, v);
             }
-            if (v.flatShadeWeld != null){
-                foreach(shatterTriangle t in v.flatShadeWeld.faces){
-                    considerConnection(t, v.flatShadeWeld);
-                }
-                v.flatShadeWeld.faces.Add(this);
-            }
             v.faces.Add(this);
         }
     }
@@ -120,7 +145,7 @@ public class shatterTriangle{
         if (!adjacent.Contains(t)){
             int seenIndex = seenOnce.IndexOf(t);
             if (seenIndex != -1){
-                if (!seenOnceVerts[seenIndex].excludeEdges.Contains(v)){
+                if (!(seenOnceVerts[seenIndex].excludeEdges.Contains(v) || v.excludeEdges.Contains(seenOnceVerts[seenIndex]))){
                     adjacent.Add(t);
                     t.adjacent.Add(this);
                 }
@@ -136,32 +161,20 @@ public class shatterTriangle{
         foreach (shatterVert v in verts){
             if (v.intersectTunnel != null){
                 foreach(shatterTriangle t in v.intersectTunnel.faces){
-                    considerConnectionTunnel(t, intersectTunnelInternal, v);
+                    considerConnectionTunnel(t);
                 }
             }
         }
     }
     
-    private void considerConnectionTunnel(shatterTriangle t, bool tunnelIn, shatterVert v){
+    private void considerConnectionTunnel(shatterTriangle t){
         if (adjacent.Contains(t)) return;
-        float tDepth = characteriseTriangleSide(t);
-        if ((tDepth > epsilon && !tunnelIn) || (tDepth < -epsilon && tunnelIn)){
-            adjacent.Add(t);
-        }
-        else{
-            t.culled=true;
-        }
+        adjacent.Add(t);
+        t.adjacent.Add(this);
     }
 
-    private float characteriseTriangleSide(shatterTriangle t){
-        float bestMetric = 0;
-        foreach (shatterVert v in t.verts){
-            float metric = Vector3.Dot(v.pos - verts[0].pos, norm);
-            if (Mathf.Abs(metric) > Mathf.Abs(bestMetric)){
-                bestMetric = metric;
-            }
-        }
-        return bestMetric;
+    public float distance(Vector3 p){
+        return Vector3.Dot(p - verts[0].pos, norm);
     }
 
     public void cull(){
@@ -169,6 +182,7 @@ public class shatterTriangle{
         foreach (shatterTriangle tri in adjacent){
             tri.adjacent.Remove(this);
         }
+        adjacent.Clear();
         foreach (shatterVert v in verts){
             v.faces.Remove(this);
         }

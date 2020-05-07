@@ -6,10 +6,9 @@ public class shatterVert{
     public Vector3 pos;
     public Vector2 uv;
     public shatterVert intersectTunnel = null;
-    public shatterVert flatShadeWeld = null;
     public List<shatterTriangle> faces;
-    public shatterTriangle causalTri = null;
     public List<shatterVert> excludeEdges;
+    public List<shatterVert> projenitorEdges;
     public int meshingNumber = -1;
     public int consumptionNumber = -1;
 
@@ -18,19 +17,31 @@ public class shatterVert{
         uv = U;
         faces = new List<shatterTriangle>();
         excludeEdges = new List<shatterVert>();
+        projenitorEdges = new List<shatterVert>();
     }
     public shatterVert(shatterVert other){
         pos = other.pos;
         uv = other.uv;
         faces = new List<shatterTriangle>();
         excludeEdges = new List<shatterVert>();
+        projenitorEdges = new List<shatterVert>();
+    }
+
+    public void absorb(shatterVert other){
+        if (other.intersectTunnel != null && intersectTunnel == null){
+            intersectTunnel = other.intersectTunnel;
+            intersectTunnel.intersectTunnel = this;
+        }
     }
 
     public Vector3 getNorm(){
         Vector3 norm = Vector3.zero;
+        float totalArea = 0;
         foreach (shatterTriangle f in faces){
-            norm += f.norm;
+            float area = f.area;
+            norm += f.norm * area;
+            totalArea += area;
         }
-        return norm/faces.Count;
+        return norm/totalArea;
     }
 }
