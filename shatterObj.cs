@@ -10,7 +10,7 @@ public class shatterObj : MonoBehaviour{
 
     void Start(){
         if (substrate == null){
-            substrate = new shatterMesh(GetComponent<MeshFilter>().mesh);
+            substrate = new shatterMesh(GetComponent<MeshFilter>().mesh, new Vector3(0,0,0), true, substrateTemplate);
         }
     }
 
@@ -88,7 +88,7 @@ public class shatterObj : MonoBehaviour{
                 v.meshingNumber = meshingNumber++;
                 Vertices.Add(v.pos);
                 UV.Add(v.uv);
-                Normals.Add(v.getNorm());
+                Normals.Add(tri.norm);
                 Triangles.Add(v.meshingNumber);
             }
         }
@@ -98,7 +98,7 @@ public class shatterObj : MonoBehaviour{
                 v.meshingNumber = meshingNumber++;
                 Vertices.Add(v.pos);
                 UV.Add(v.uv);
-                Normals.Add(v.getNorm());
+                Normals.Add(tri.norm);
                 Triangles.Add(v.meshingNumber);
             }
             if (!isFragment){

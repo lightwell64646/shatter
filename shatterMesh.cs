@@ -8,15 +8,14 @@ public class shatterMesh{
     public List<shatterTriangle> triangles;
     //public bool cutFlat = true;
     private List<shatterVert> activeCuts;
+    public GameObject debugTemplate;
 
-    private float epsilon = 1E-4f;
+    private float epsilon = 1E-6f;
+    private float areaEpsilon = 1E-3f;
 
-    public shatterMesh(Mesh m){
-        createShatterMesh(m, new Vector3(0,0,0), true);
-    }
-
-    public shatterMesh(Mesh m, Vector3 offset, bool isSubstrate = true){
+    public shatterMesh(Mesh m, Vector3 offset, bool isSubstrate = true, GameObject template = null){
         createShatterMesh(m, offset, isSubstrate);
+        debugTemplate = template;
     }
 
     public shatterMesh(){
@@ -34,13 +33,12 @@ public class shatterMesh{
         other.cut(this, thisOrigTris);
         other.cullExternal(this, thisOrigTris);
         for (int i=thisOrigTris; i<triangles.Count; i++){
-            triangles[i].populateAdjacentTunneled(true);
+            triangles[i].populateAdjacentTunneled();
         }
     }
 
     public void cut(shatterMesh other, int stopCheck = -1){
         activeCuts.Clear();
-        int thisOrigTris = triangles.Count;
         if (stopCheck < 0)
             stopCheck = other.triangles.Count;
         for (int i=0; i<stopCheck; i++){
@@ -54,22 +52,25 @@ public class shatterMesh{
         for (int i=0; i<triangles.Count; i++){
             triangles[i].populateAdjacent();
         }
-        /*foreach (shatterVert v in activeCuts){
+        foreach (shatterVert v in activeCuts){
             if (v.excludeEdges.Count != 2){
                 Debug.Log(v.excludeEdges.Count);
                 Debug.Log(v.pos);
             }
-        }*/
+        }
     }
 
     private void cutTri(shatterTriangle tri, shatterTriangle other){
         float parallelMetric = Vector3.Dot(tri.norm, other.norm);
+        if (parallelMetric > 1-epsilon || parallelMetric < epsilon - 1) return;
+
         List<shatterVert> intersects = new List<shatterVert>();
         for (int i=0; i < 3; i++){
             shatterVert intersect = tri.intersect(other.verts[i], other.verts[(i+1)%3]);
             if (intersect != null && getDuplicate(intersect.pos, intersects) == -1){
                 int dup = getDuplicate(intersect.pos, tri.storedIntersects);
                 if (dup != -1){
+                    tri.storedIntersects[dup].absorb(intersect);
                     intersect = tri.storedIntersects[dup];
                 }
                 intersects.Add(intersect);
@@ -80,6 +81,7 @@ public class shatterMesh{
                 shatterVert intersectThis = null;
                 int dup = getDuplicate(intersectOther.pos, tri.storedIntersects);
                 if (dup != -1){
+                    tri.storedIntersects[dup].absorb(intersectOther);
                     intersectThis = tri.storedIntersects[dup];
                 }
                 else{
@@ -96,12 +98,16 @@ public class shatterMesh{
     }
 
     private int getDuplicate(Vector3 newV, List<shatterVert> currentV){
+        float minDist = epsilon;
+        int res = -1;
         for (int i=0; i<currentV.Count; i++){
-            if (Vector3.Magnitude(newV - currentV[i].pos) < epsilon){
-                return i;
+            float met = Vector3.Magnitude(newV - currentV[i].pos);
+            if (met < minDist){
+                res = i;
+                minDist = met;
             }
         }
-        return -1;
+        return res;
     }
 
     private void repairTri(shatterTriangle tri, List<shatterVert> intersects){
@@ -111,7 +117,6 @@ public class shatterMesh{
                 Debug.Log(i.pos);
             }
         }
-        if (intersects.Count != 2) return;
 
         int dup, dupCount, origID;
         dupCount = 0;
@@ -136,26 +141,64 @@ public class shatterMesh{
                 activeCuts.Add(intersects[i]);
             }
             else if (intersects[0] != activeCuts[dup]){
+                activeCuts[dup].absorb(intersects[i]);
                 intersects[i]=activeCuts[dup];
             }
         }
 
-        Debug.Log(new Vector3(dupCount, intersects[0].excludeEdges.Count, intersects[1].excludeEdges.Count));
-        intersects[0].excludeEdges.Add(intersects[1]);
-        intersects[1].excludeEdges.Add(intersects[0]);
-        if (dupCount == 0){
-            repairTri2(tri, intersects);
+
+        int debugCount = triangles.Count;   
+        Debug.Log(intersects.Count);     
+        if (intersects.Count == 2){
+            //Debug.Log(new Vector3(dupCount, intersects[0].excludeEdges.Count, intersects[1].excludeEdges.Count));
+            intersects[0].excludeEdges.Add(intersects[1]);
+            intersects[1].excludeEdges.Add(intersects[0]);
+            if (dupCount == 0){
+                repairTri2(tri, intersects);
+            }
+            else if (dupCount == 1){
+                repairTri1(tri, intersects[origID]);
+            }
         }
-        else if (dupCount == 1){
-            repairTri1(tri, intersects[origID]);
+        /*else if (intersects.Count == 1){
+            repairTri1(tri, intersects[0]);
+        }*/
+
+        if (triangles.Count != debugCount){
+            //Debug
+            Mesh newSubMesh = new Mesh();
+            List<Vector3> vertsDebug = new List<Vector3>();
+            List<Vector3> normalsDebug = new List<Vector3>();
+            List<Vector2> uvDebug = new List<Vector2>();
+            List<int> trianglesDebug = new List<int>();
+            int meshNum = 0;
+            foreach (shatterTriangle t in triangles){
+                if (!t.culled){
+                    foreach (shatterVert v in t.verts){
+                        vertsDebug.Add(v.pos);
+                        normalsDebug.Add(t.norm);
+                        trianglesDebug.Add(meshNum);
+                        uvDebug.Add(v.uv);
+                        meshNum += 1;
+                    }
+                }
+            }
+            newSubMesh.vertices = vertsDebug.ToArray();
+            newSubMesh.triangles = trianglesDebug.ToArray();
+            newSubMesh.normals = normalsDebug.ToArray();
+            newSubMesh.uv = uvDebug.ToArray();
+
+            if (debugTemplate != null && debugTemplate.GetComponent<MeshFilter>()!=null){
+                debugTemplate.GetComponent<MeshFilter>().mesh = newSubMesh;
+                GameObject newSub = GameObject.Instantiate(debugTemplate);
+            }
         }
+        
     }
 
     private void repairTri1(shatterTriangle triangle, shatterVert inter){
         for (int i=0; i<3; i++){
-            if (inter.projenitorEdges.Count == 0 || 
-                    !(inter.projenitorEdges.Contains(triangle.verts[i]) &&
-                    inter.projenitorEdges.Contains(triangle.verts[(i+1)%3]))){
+            if (nonLinear(triangle.verts[i].pos, triangle.verts[(i+1)%3].pos, inter.pos)){
                 shatterTriangle newTri = new shatterTriangle(triangle.verts[i], triangle.verts[(i+1)%3], inter, triangle.isSubstrate);
                 newTri.storedIntersects = triangle.storedIntersects;
                 triangles.Add(newTri);
@@ -166,10 +209,7 @@ public class shatterMesh{
 
     private void repairTri2(shatterTriangle triangle, List<shatterVert> intersects){
         for (int i=0; i<3; i++){
-            if (nonLinear(triangle.verts[i].pos, triangle.verts[(i+1)%3].pos, intersects[0].pos) ||
-                    intersects[0].projenitorEdges.Count == 0 || 
-                    !(intersects[0].projenitorEdges.Contains(triangle.verts[i]) &&
-                    intersects[0].projenitorEdges.Contains(triangle.verts[(i+1)%3]))){
+            if (nonLinear(triangle.verts[i].pos, triangle.verts[(i+1)%3].pos, intersects[0].pos)){
                 shatterTriangle newTri = new shatterTriangle(triangle.verts[i], triangle.verts[(i+1)%3], intersects[0], triangle.isSubstrate);
                 if (newTri.containsPlanar(intersects[1].pos)){
                     repairTri1(newTri, intersects[1]);
@@ -186,12 +226,7 @@ public class shatterMesh{
     private bool nonLinear(Vector3 p1, Vector3 p2, Vector3 p3){
         Vector3 v1 = p2-p1;
         Vector3 v2 = p3-p1;
-        Vector3 v3 = p3-p2;
-        if (Vector3.Magnitude(v3) > Vector3.Magnitude(v2)){
-            v2 = v3;
-        }
-        float metric = Vector3.Dot(Vector3.Normalize(v1), Vector3.Normalize(v2));
-        return metric < 1-1E-6f && metric > 1E-6f - 1;
+        return Vector3.Magnitude(Vector3.Cross(v1, v2)) > areaEpsilon;
     }
 
     private void createShatterMesh(Mesh m, Vector3 offset, bool isSubstrate){

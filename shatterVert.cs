@@ -28,6 +28,11 @@ public class shatterVert{
     }
 
     public void absorb(shatterVert other){
+        /*if (other.excludeEdges.Count != 0){
+            Debug.Log(other.excludeEdges.Count);
+            Debug.Log(other == this);
+        }*/
+        pos = (pos + other.pos) / 2.0f;
         if (other.intersectTunnel != null && intersectTunnel == null){
             intersectTunnel = other.intersectTunnel;
             intersectTunnel.intersectTunnel = this;

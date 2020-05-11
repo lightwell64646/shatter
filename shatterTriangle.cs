@@ -19,6 +19,7 @@ public class shatterTriangle{
     private float a,b,c,d;
     
     private float epsilon = 1E-12f;
+    private float largeEpsilon = 1E-4f;
     private List<shatterTriangle> seenOnce;
     private List<shatterVert> seenOnceVerts;
 
@@ -35,7 +36,7 @@ public class shatterTriangle{
         norm = Vector3.Normalize(norm);
 
         up = Vector3.Cross(norm, Vector3.right);
-        if (Vector3.Magnitude(up) < 1E-4f){
+        if (Vector3.Magnitude(up) < largeEpsilon){
             up = Vector3.Cross(norm, Vector3.up);
         }
         up = Vector3.Normalize(up);
@@ -64,7 +65,7 @@ public class shatterTriangle{
         float lvAlign = Vector3.Dot(lv, norm);
         float travelT = -loDist / lvAlign;
         float parallelMetric = Vector3.Dot(Vector3.Normalize(lo), norm);
-        if (travelT > 1 || travelT < 0 || Mathf.Abs(lvAlign) < 1E-4f){
+        if (travelT > 1 || travelT < 0 || Mathf.Abs(lvAlign) < largeEpsilon){
             return null;
         }
         
@@ -90,7 +91,7 @@ public class shatterTriangle{
         float loDist = Vector3.Dot(lo, norm);
         float lvAlign = Vector3.Dot(lv, norm);
         float travelT = -loDist / lvAlign;
-        if (travelT > 1 || travelT < 0 || Mathf.Abs(lvAlign) < 1E-4f){
+        if (travelT > 1 || travelT < 0 || Mathf.Abs(lvAlign) < largeEpsilon){
             return false;
         }
         
@@ -110,14 +111,14 @@ public class shatterTriangle{
         Vector2 bari = new Vector2(d*proj2[0] - b*proj2[1], a*proj2[1] - c*proj2[0]);
         bari = det*bari;
         float w = 1 - bari[0] - bari[1];
-        if (bari[0] < -1E-4f || bari[1] < -1E-4f || w < -1E-4f){
+        if (bari[0] < -epsilon || bari[1] < -epsilon || w < -epsilon){
             return false;
         }
         return true;
     }
 
     public shatterVert portIn(shatterVert v){
-        Vector2 proj2 = collapse(v.pos);
+        Vector2 proj2 = collapse(v.pos) - p02D;
         Vector2 bari = new Vector2(d*proj2[0] - b*proj2[1], a*proj2[1] - c*proj2[0]);
         bari = det*bari;
         float w = 1 - bari[0] - bari[1];
@@ -157,7 +158,7 @@ public class shatterTriangle{
         }
     }
 
-    public void populateAdjacentTunneled(bool intersectTunnelInternal = true){
+    public void populateAdjacentTunneled(){
         foreach (shatterVert v in verts){
             if (v.intersectTunnel != null){
                 foreach(shatterTriangle t in v.intersectTunnel.faces){
